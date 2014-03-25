@@ -1,0 +1,666 @@
+Snd
+
+Snd is a sound editor.  It currently runs on nearly all
+Unix-based systems, including Mac OSX and Cygwin.
+To build Snd, get the sources from
+
+  ftp://ccrma-ftp.stanford.edu/pub/Lisp/snd-12.tar.gz
+
+  gzip -d snd-12.tar.gz
+  tar xf snd-12.tar
+  cd snd-12
+  ./configure
+  make
+  make install
+
+
+The configure script has a bunch of arguments:
+
+   Extension language:
+
+     --with-s7                 use s7 (the default, a version of Scheme).
+
+     --with-ruby               use Ruby as the extension language
+       --with-ruby-prefix      set location of Ruby
+  
+     --with-forth              use Forth (Mike Scholz's FTH) as the extension language.
+  
+
+     To build Snd without any extension language, use --without-extension-language
+  
+
+   Graphics:
+
+     --with-motif              use Motif (the default, if it exists)
+       --with-static-motif     same, but load Motif statically
+       --with-motif-prefix     set Motif location (will append lib and include)
+                               on my machine: --with-motif-prefix=/usr/X11R6
+  
+     --with-gtk                use Gtk+
+  
+     --with-no-gui             make Snd without any graphics support
+  
+     --with-gl                 include support for OpenGL (default: no, Motif only)
+       --with-just-gl          same but omit extension language bindings in gl.c (default: no)
+                                 The gl module is only useful if you want to write
+                                 code to add your own OpenGL graphics to Snd.
+                                 --with-just-gl will give you the GL spectrograms
+                                 without any extras.
+  
+       --with-gl2ps            include gl2ps (postscript output from OpenGL graphics)
+  
+     --with-static-xm          include the xm module (rather than loading it dynamically)
+  			       this option affects xm.c for Motif, xg.c for Gtk.
+                                 You'll need this (or need to "make xm" and load xm.so
+                                 at runtime) if you want to use Dave Phillips'
+                                 extensions described in the tutorial.
+       --with-static-xg        same as above, but refers to the gtk xg module.    
+                                 To build xg.so separately, use "make xg".  
+           
+   Audio:
+
+     --with-alsa               use ALSA if possible (the default in Linux)
+       --with-static-alsa      use ALSA statically loaded
+
+     --with-oss                use OSS (not tested in a long time)
+  
+     --with-esd                use the enlightened sound daemon, if possible
+  
+     --with-jack               use the Jack library (can be used in conjunction
+                                 with --with-alsa)
+
+     --with-pulseaudio         use PulseAudio (untested)
+     --without-audio
+
+
+   Numerics:
+
+     --with-doubles            use doubles throughout (default=yes)
+
+     --with-gmp                use gmp, mpfr, and mpc to implement multiprecision arithmetic
+
+     --with-float-samples      represent samples internally as floats (default=yes)
+     --with-sample-width=N     use N bits of samples (default: 24). N = 32 or so is 
+                                 not recommended because it does not leave you any 
+                                 "head room" during mixes. N < 16 isn't supported.
+
+
+   Other options:
+
+     --with-ladspa             include LADSPA plugin support (default: yes in Linux)
+  
+     --with-snd-as-widget      make Snd a loadable widget, not a standalone program
+
+     --with-temp-dir           directory to use for temp files (default: ".")
+     --with-save-dir           directory to use for saved-state files (default: ".")
+     --with-doc-dir            directory to search for documentation
+
+     --with-shared-sndlib      try to use libsndlib.so (default: no).  The path to
+                                 sndlib-config can be specified via SNDLIB_CONFIG_path.
+  			         Normally, sndlib is built into Snd at compile time.
+
+
+If the configure/make process fails, please send me
+(bil@ccrma.stanford.edu) the files mus-config.h, config.log, and makefile,
+created (or updated) by configure.
+
+Snd comes with s7, but if you insist on building Snd without any extension 
+language, you'll find that it's severely limited in what it can do.  
+Snd can also be built without any graphics toolkit.  Without either the GUI 
+or an extension language, however, there's nothing it can do.
+
+Here at CCRMA, we use this configure invocation:
+
+  ./configure --with-jack --with-temp-dir=/zap --with-static-xm --with-gl --with-gl2ps
+
+but I'd recommend --with-just-gl elsewhere (the various GL implementations
+are different enough that gl.c can be a pain to build).
+
+
+Version info:
+  if Gtk, then Gtk+ 2.12 or later and Cairo 1.6.4 or later
+  if Motif, then Motif 2.n but not Lesstif
+  in Linux, if ALSA, then ALSA 1.0 or later
+  if Ruby, Ruby 1.8.0 or later.  
+  if Forth, any version
+  if s7, any version
+  if GSL, version 1.0 or later
+  if gamin, version 0.1.0 or later
+
+
+----------------------------------------------------------------
+
+The customization/extension languages are either s7, Ruby, or Forth.
+
+Much of Snd's functionality is loaded as needed from the Scheme, Ruby, or Forth
+files found in the tarball (*.scm, *.rb, and *.fs).  You can run Snd without 
+these files, but there's no reason to!  Just add the directory containing
+those files to the "load-path".  In s7,
+
+  (set! *load-path* (cons "/home/bil/cl" *load-path*))
+
+*load-path* is the list of directories that s7 looks at when trying
+to find a file to load.  Here I've added "/home/bil/cl" so that Snd
+can find its sources no matter what directory I run it in.  If you 
+create a file named ~/.snd_s7 and put such a line in it, you'll
+never have to think about it again.  In the other languages:
+
+Ruby:   $LOAD_PATH.push("/home/bil/cl")
+Forth:  "/home/bil/cl" add-load-path
+
+----------------------------------------------------------------
+
+The documentation is in snd.html, extsnd.html, grfsnd.html, sndscm.html,
+sndlib.html, sndclm.html, fm.html, s7.html, and libxm.html.  There's also a fancier 
+wrapper for the documentation: snd1.html.  A brief change log is in HISTORY.Snd.
+Dave Phillips has written a tutorial: see the tutorial directory.
+
+
+The mailing list for Snd is the same as that for Common Music:
+cmdist@ccrma.stanford.edu.  To subscribe, visit
+
+  http://ccrma-mail.stanford.edu/mailman/listinfo/cmdist
+
+To follow the Snd CVS repository, the first time you need to
+
+       cvs -d:pserver:anonymous@snd.cvs.sourceforge.net:/cvsroot/snd login 
+       cvs -z3 -d:pserver:anonymous@snd.cvs.sourceforge.net:/cvsroot/snd co cvs-snd
+
+When prompted for a password for anonymous, press the Enter key. 
+After that, you go to your local cvs-snd directory and
+
+       cvs update 
+
+
+Included with Snd are three command-line programs that might
+be of interest: sndplay, sndinfo, and audinfo:
+
+  make sndplay
+
+
+----------------------------------------------------------------
+This software is available to anyone who is interested, free gratis
+for nothing, without warranties of any kind (see the file COPYING for
+legalese).  Send bug reports or suggestions to bil@ccrma.stanford.edu.
+----------------------------------------------------------------
+
+
+Authors:
+
+Bill Schottstaedt
+Michael Scholz
+Kjetil S. Matheussen
+
+Rick Taube and Andrew Burnson:      C++ and Windows wizardry.
+Dave Phillips:                      the tutorial, new-effects.scm, and many other files.
+Fernando Lopez-Lezcano:             the current ALSA support.
+Richard W.E. Furse:                 the original LADSPA support.
+Nick Bailey:                        the ESD support.
+Volker Kuhlmann and Seppo Ingalsuo: the Solaris port.
+Seppo Ingalsuo:                     the HPUX port.
+Juan Reyes:                         the DEC Alpha port.
+Guenter Geiger and Stefan Schwandter: the Linux Alpha port.
+Paul Davis:                         the original ALSA support.
+Steven Schultz and Mike Scholz:     the *BSD ports.
+Ludger Brummer and Charles Nichols: the Mac-OSX port.
+Thomas Klausner:                    the NetBSD port.
+Steve Beet:                         minGW
+
+Plus many other contributions from
+  Fernando Lopez-Lezcano, 
+  Tom Roth,
+  Fabio Furlanete,
+  Rick Taube,
+  Anders Vinjar,
+  Olivier Doare,
+  Ville Koskinen,
+  Andrew Burnson.
+
+
+In terms of number of lines, the languages used in Snd/Sndlib are:
+C, Scheme, Ruby, Forth, m4, Emacs Lisp, javascript,
+Fortran, and postscript (altogether about 700,000 lines).
+
+
+----------------------------------------------------------------
+
+If you hit a bug, don't just sit there weeping -- send me
+(bil@ccrma.stanford.edu) a description of it!  If it's something like
+a segfault, you have gdb, and you can build Snd from the sources, it
+would help me a lot if you could build it with the -g switch, then
+
+gdb snd
+run
+<here do whatever it takes to get the bug>
+where
+
+The 'where' command should print out the current stack trace which
+is extremely helpful to me in tracking down the problem.  It can also
+be helpful to move to the first Snd-related function in the stack
+(via the 'up' command), then type
+
+info locals
+
+This will print out the value of the local variables.  In most cases,
+that's all I need to fix the bug immediately.  If Snd
+appears to be hung, you can 
+
+gdb snd
+break exit
+run
+<now get it to hang, then type control-C to exit>
+where
+
+
+
+----------------------------------------------------------------
+
+URLS
+
+CCRMA:
+  http://ccrma.stanford.edu/
+  http://ccrma.stanford.edu/~jos/
+  http://ccrma.stanford.edu/planetccrma/software/
+  http://ccrma.stanford.edu/planetccrma/software/soundapps.html#snd
+  http://ccrma-mail.stanford.edu/pipermail/cmdist/
+  http://ccrma-mail.stanford.edu/mailman/listinfo/planetccrma
+
+Snd:
+  ftp://ccrma-ftp.stanford.edu/pub/Lisp/snd-12.tar.gz
+  http://ccrma.stanford.edu/software/snd/
+  http://sourceforge.net/projects/snd/
+  http://www.notam02.no/arkiv/doc/snd-rt/
+  http://linux.oreillynet.com/pub/a/linux/2001/10/05/snd_partone.html
+  http://linux.oreillynet.com/pub/a/linux/2001/10/18/snd_parttwo.html
+  http://www.saunalahti.fi/~mjkoskin/
+  http://www.notam02.no/9
+  http://www.linuxjournal.com/article.php?sid=7274
+  http://www.blastwave.org/packages/snd (Solaris package)
+  http://www.notam02.no/arkiv/src/snd/ (snd-ls)
+  http://www.notam02.no/~kjetism/sandysth/
+
+Scheme:
+  http://www.cs.utexas.edu/~novak/schemevscl.html
+  http://www.cs.indiana.edu/scheme-repository
+  http://www.schemers.org/
+  http://www.ccs.neu.edu/home/dorai/t-y-scheme/t-y-scheme.html
+  http://www.cs.utexas.edu/users/wilson/schintro/schintro_toc.html
+  http://www.swiss.ai.mit.edu/~jaffer/SLIB.html
+  http://mitpress.mit.edu/sicp/full-text/book/book.html
+
+Forth:
+  http://sourceforge.net/projects/fth
+
+Motif:
+  http://www.motifzone.net
+
+Gtk+:
+  http://www.gtk.org
+  ftp://ftp.gtk.org/pub/gtk/
+
+OpenGL:
+  http://www.mesa3d.org/
+  http://mesa3d.sourceforge.net/
+  http://www.geuz.org/gl2ps/
+
+GSL:
+  ftp://ftp.gnu.org/gnu/gsl
+
+Ruby:
+  comp.lang.ruby
+  http://www.ruby-lang.org
+
+fftw:  
+  http://www.fftw.org
+
+
+On LADSPA, Dave Phillips adds: "I have used the LADSPA plugins as standalone 
+effects processing modules. The Help texts for the LADSPA effects are courtesy 
+Steve Harris, with edits and emendations from yours truly. You will need the 
+latest plugin sets from www.ladspa.org and plugin.org.uk to make full use of 
+the LADSPA effects in Snd."
+
+
+
+----------------------------------------------------------------
+
+TROUBLES:
+
+
+---- audio (a can of worms) ----
+
+In Linux, Snd sometimes can't seem to play or record when other
+applications are happy -- if this happens, please evaluate the function
+mus-audio-describe, and send me whatever it prints out. 
+
+If nothing plays in Linux (try aplay for example), and the sound preferences
+have no effect, look for the pulseaudio daemon, and kill it.
+
+If you're running esd, you need to build Snd with the configuration
+switch --with-esd.  Otherwise, it's likely you'll get an error
+from the 'play' button complaining about data formats, probably
+that it can't handle big-endian shorts.
+
+
+The Record dialog only works in Linux (OSS, perhaps ALSA), Sun (not x86),
+some SGI systems, and perhaps Mac OSX.  In Linux, someone below the level
+of my code randomly switches input between the microphone and the line-in
+jack -- I don't know why or how to stop it!  If this is happening to you,
+the recorder will appear to stop working, then if you leave it and
+return, it will be happy again -- extremely annoying!
+
+
+In X86 Solaris, you may need to install Jurgen Keil's audio drivers.
+They can be found at http://www.tools.de/solaris.  Here are some
+suggestions from Russell Aspinwall:
+
+    Assuming you are using the Java Desktop System, then if there is sound 
+    you will find a speaker in the lower right hand corner, if there is a 
+    red line through it then it has not detected the sound card. 
+
+    To find the audio device , as root run 
+
+    # prtconf -pv > /tmp/prtconf.txt 
+
+    open prtconf.txt in text editor and search for "Audio Device", this will 
+    give the pci identifiers. grep /etc/driver_aliases for those pci 
+    identifiers and this will identify the Device Driver. 
+
+    # mixerctl 
+
+    should return [some description of the audio hardware]
+
+But I still have not managed to get output on my machine.  Apparently
+the audio card thinks it's the local network controller or something.
+
+
+---- ALSA: ----
+
+Only versions from 1.0 of ALSA are supported.
+
+On recording, here's a note from Fernando from cmdist:
+
+    > Recently I installed a sound card with digital in (with cmi8738 chip)
+    > in my linux system with alsa. With 'arecord -D hw:0.2' I can succesfully record
+    > from my digital input. How can I do the same with with Snd? The
+    > digital inputs do not appear on the record window. I compiled Snd with alsa support.
+    
+    You could try to set up an environment variable before starting snd to 
+    point to that particular device. This is the way snd reacts to env 
+    variables:
+    
+    - searched for in the following order:
+      MUS_ALSA_PLAYBACK_DEVICE
+         defines the name of the playback device
+      MUS_ALSA_CAPTURE_DEVICE
+         defines the name of the capture device
+      MUS_ALSA_DEVICE
+         defines the name of the playback and capture device
+      use the first two if the playback and capture devices are different or the
+      third if they are the same.
+    
+    So you could try:
+      MUS_ALSA_DEVICE="hw:0,2" snd
+    if you are using bash as your shell
+    
+    This should use the digital i/o as the input output device.  It would also
+    be possible to concatenate several devices using a definition in the
+    .asoundrc file but that would involve understanding its arcane
+    configuration language, which I don't. The current snd alss 0.9 code only
+    looks at the first device it finds (normally hw:0,0).
+    
+    -- Fernando
+
+There's also a discussion of RME cards in the cmdist archives.
+
+
+An addendum: in my system, I have a wretched sound card in my machine,
+and an EMI 2|6 connected to a USB connector.  So the EMI device is "hw:1"
+in Alsa terms, and since I never want to use the internal sound card,
+I have this line in my ~/.cshrc file:
+
+setenv MUS_ALSA_DEVICE "hw:1"
+
+But this number seems to be set randomly at boot time!  And sometimes, Alsa
+in its infinite wisdom mutes the playback device. So, now I
+have these lines executing at startup:
+
+amixer sset PCM,0 80% unmute
+amixer sset Mic,0 80%
+
+If you use 100% (meaning, give me full amplitude output), it's the same
+as 0!!  
+
+On a different machine, I use:
+
+setenv MUS_ALSA_DEVICE "plughw:0"
+
+
+
+If you get some complaint like
+
+  ;Invalid argument: cannot set hardware parameters for default
+
+try setting:
+
+    (set! (mus-alsa-device) "plughw:0")
+
+then try playing again.  The "default" device is always completely
+broken.  
+
+
+
+---- Motif: ----
+
+Only Motif 2.n is supported.  Be sure to get the Motif development
+package if you want to build Snd (you need the Motif headers).
+
+If you have installed Motif in some weird place, use the --with-motif-prefix
+configure argument.
+
+In Fedora 7 and later, openMotif will need /usr/include/X11/extensions/Print.h
+/usr/include/X11/bitmaps/gray, and /usr/X11R6/lib/libXp.so.  I copy these
+from old machines, but there must be a better way...
+
+On 64-bit machines, use motif 2.3.2 or later.
+
+
+
+---- Gtk+: ----
+
+Only Gtk 2.10 or later is supported.  
+
+If you get an error like:
+
+  Gtk-WARNING **: <much useless mumbling>
+
+you can find where it occurs by:
+
+  gdb snd
+  run --g-fatal-warnings
+    <now do whatever it takes to hit the warning>
+  where
+
+In some cases, if you installed gtk from an RPM file, you
+also need to install gtk-devel.
+
+
+Gtk is changing rapidly these days, moving toward Gtk 3. Snd is struggling
+to keep pace, but expect trouble! 
+
+
+
+
+---- Mac OSX: ---- 
+
+You can use either Motif or Gtk running under X11; to start Snd from an
+ordinary shell, use the open-x11 command:
+
+  open-x11 snd
+
+or (in later versions of OSX) just start snd, and X should start automatically.
+
+To install X11, first, install the X11SDK and X11User packages.  
+The first is in one of the Installer directories, the second (in 10.4) 
+is on the first install disk under System/Installation/Packages/X11User.pkg 
+or some such name.  These give you the X11 server and its header files.
+
+
+There are several ways to go from here; the simplest is probably
+to use Darwin Ports as outlined by Hans Fugal:
+
+  I installed openmotif and gsl with Darwin Ports: 
+
+  sudo port install openmotif 
+  sudo port install gsl 
+
+  Then I did the regular: 
+
+  ./configure --with-motif --with-ruby 
+  make 
+  sudo make install 
+  open-x11 /usr/local/bin/snd 
+
+
+If you get some complaint about identifiers that look like they come
+from libSM or libICE, add -lICE -lSM to the end of the library
+list in the makefile.
+
+
+If C-f (and other such commands) doesn't work, either try toggling
+the "w" button, or enable pointer focus:
+
+  (set! (with-pointer-focus) #t)
+
+
+If the openmotif package forgot to include libXm.a (Motif), a version is
+at ccrma-ftp.  If the Mac loader complains that it it out of date,
+run ranlib: ranlib libXm.a (you may need to admin privileges to do this).
+
+
+On my OSX 10.4 Mac, the configuration command I use is:
+
+./configure --with-motif-prefix=/usr/OpenMotif --with-static-xm
+
+So, I believe all the rest of these instructions are obsolete,
+but if the simple case above fails, they may help you get going.
+
+
+See also the cmdist archives for tips from Juan Pampin and others.
+
+Here's some info from Josh Mattoon:
+
+    "It turns out everything required for snd is now in fink! 
+
+     sudo fink install openmotif3 fftw
+
+    So... after a loooong compilation process (fftw required g77) I had
+    everything in place.  But ./configure couldn't find them, d'oh.  My
+    simple solution was to pass in the CFLAGS and LDFLAGS as so:
+    
+    CFLAGS=-I/sw/include LDFLAGS="-L/sw/lib -lmx -bind_at_load" ./configure \ 
+         --with-gl --with-editres --with-static-xm
+    
+    This was after a bit of trial and error.  The linker couldn't find
+    some symbols that turned out to be in libmx, so I added that, and the
+    linker also suggested the bind_at_load (though I'm not totally sure
+    what that means)."
+
+
+(fftw is optional in Snd).  Adam Tinsdale had better luck with this:
+
+    CFLAGS=-I/sw/include LDFLAGS="-L/sw/lib -lmx -bind_at_load" ./configure  \
+      --with-motif --without-fftw --with-static-xm
+
+
+The dac-size variable seems to matter a lot in OSX.  If you're
+getting distorted playback, try various powers of 2.  It defaults
+to 64.
+
+Rick Taube mentions this for tracing the load process:
+
+  [...]you can set the DYLD_PRINT_LIBRARIES shell variable:
+
+        DYLD_PRINT_LIBRARIES=1
+        export DYLD_PRINT_LIBRARIES
+
+  some other useful dylib variables:
+
+        DYLD_FRAMEWORK_PATH
+        DYLD_FALLBACK_FRAMEWORK_PATH
+        DYLD_LIBRARY_PATH
+        DYLD_FALLBACK_LIBRARY_PATH
+
+
+So, here's the detailed step-by-step method, thanks to Cris Ewing:
+
+    This build was done on a Mac G4 Powerbook with OS X 10.3 (panther).
+    
+    The first step (and it is a vital one) is to make sure that your version
+    of fink is fully up-to-date.  Start by running
+    
+    $ fink selfupdate
+    $ fink update-all
+    
+    Next, verify that you have a working version of X11 on your machine.  This
+    must include the development libs found in the X11SDK.  If you are using
+    apple's version of X11, the SDK package is _not_ installed by default when
+    you install X11.  You have to do a custom install from the XCode disk to
+    get the package.
+    
+    Once all this is in place, use fink to install openmotif3
+    
+    $ fink install openmotif3
+    
+    You can also use fink to install the fftw package.  It takes a really long
+    time to build, but helps to speed up the fft-based functions in snd.
+    
+    $ fink install fftw
+    
+    Next, download and untar the latest snd sources from ccrma
+    
+    $ ./configure CFLAGS="-I/sw/include" LDFLAGS="-L/sw/lib -lmx -bind_at_load" --disable-nls --with-motif --with-static-xm --with-motif-prefix=/sw
+    
+    This config was run from a bash shell.  If you are using tcsh (and you
+    might be if you upgraded to panther) then you will have to omit the part
+    about CFLAGS and LDFLAGS above.  Instead, you can set these through the
+    shell by running
+    
+    % setenv LDFLAGS "-L/sw/lib -lmx -bind_at_load""
+    % setenv CFLAGS "-I/sw/include"
+    
+    After this, you're nearly home:
+    
+    $ make
+    
+    $ sudo make install
+    
+    (you need to sudo make install, because it will install an snd-executable
+    in /usr/local/bin)
+
+
+In OSX 10.5, I had to add Xft, Xmu, and fontconfig to the MOTIF_LIBS line in makefile:
+
+MOTIF_LIBS =  -L/usr/X11/lib -R/usr/X11/lib  -lSM -lICE -lXft -lXmu -lfontconfig /usr/X11R6-old/lib/libXm.a -L/usr/X11R6-old/lib -lXt -lXp -lX11  -lSM -lICE -lXext -lXpm
+
+(the X11R6-old business came about because I didn't remake libXm, but the OSX installation
+process moved the previous X11R6 directory to X11R6 1, which is untypable).
+
+
+-------- Ruby 1.9.2 --------
+
+The CFLAGS setting is messed up (not to mention all the directory names).
+After running configure, add 
+
+-I/usr/local/include/ruby-1.9.1/x86_64-linux -I/usr/local/include/ruby-1.9.1/ruby -I/usr/local/include/ruby-1.9.1
+ to XEN_CFLAGS in makefile, then define all the RB_* macros in mus-config.h:
+
+#define HAVE_RB_GC_DISABLE 1
+#define HAVE_RB_ARY_DUP 1
+#define HAVE_REASONABLE_RB_GC_MARK 1
+#define RB_FIND_FILE_TAKES_VALUE 1
+#define HAVE_RB_ERRINFO 1
+#define HAVE_RB_GET_LOAD_PATH 1
+
+and also change HAVE_VSNPRINTF to 0 -- Ruby's version of vsnprintf segfaults
+when passed %lld and 64-bit ints.

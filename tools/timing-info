@@ -1,0 +1,221 @@
+I tried the bird and the fm-violin in Scheme using run, and
+in C and got the following times:
+
+bird:   0.04 in C, 0.05 in Scheme
+violin: 2.40 in C, 2.83 in Scheme
+
+Similarly the Gabriel FFT benchmark (fft.sch), in s7 runs
+the fft 1000 times in 7.23 secs, whereas Guile 1.9.5 compiles it,
+then runs it in 9.89 (Guile 1.8.6 (no compiler): 56.5 secs compared
+to s7 no run: 41.2 secs).  If I were allowed to rewrite the
+benchmark slightly to avoid recursion, s7 would do even better.
+
+
+
+
+
+The Scheme calls were using the standard instruments with
+
+(time (with-sound () (bird 0 10 440.0 10.0 0.5 '(0 0 1 1) '(0 0 1 1 2 1 3 0))))
+(time (with-sound () (fm-violin 0 200 440 .1)))
+
+The bird in C is:
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+/* assume we've configured and built sndlib, so it has created a mus-config.h file */
+
+#include "mus-config.h"
+#include "s7.h"
+#include "xen.h"
+#include "clm.h"
+#include "clm2xen.h"
+
+void c_bird(double start, double dur, double frequency, double freqskew, double amplitude, 
+	    mus_float_t *freqdata, int freqpts, mus_float_t *ampdata, int amppts, mus_any *output)
+{
+  mus_long_t beg, end, i;
+  mus_any *amp_env, *freq_env, *osc;
+  beg = start * mus_srate();
+  end = start + dur * mus_srate();
+  osc = mus_make_oscil(frequency, 0.0);
+  amp_env = mus_make_env(ampdata, amppts, amplitude, 0.0, 1.0, dur, 0, NULL);
+  freq_env = mus_make_env(freqdata, freqpts, mus_hz_to_radians(freqskew), 0.0, 1.0, dur, 0, NULL);
+  for (i = beg; i < end; i++)
+    mus_out_any_to_file(output, i, 0, 
+		       mus_env(amp_env) * 
+		         mus_oscil(osc, mus_env(freq_env), 0.0));
+  mus_free(osc);
+  mus_free(amp_env);
+  mus_free(freq_env);
+}
+
+int main(int argc, char **argv)
+{
+  mus_any *out;
+  int i;
+  mus_float_t freq_points[4] = {0.0, 0.0, 1.0, 1.0};
+  mus_float_t amp_points[8] = {0.0, 0.0, 0.25, 1.0, 0.75, 1.0, 1.0, 0.0};
+
+  mus_sound_initialize();  
+  out = mus_make_sample_to_file("test.snd", 1, MUS_LFLOAT, MUS_NEXT);
+  c_bird(0.0, 10.0, 440.0, 10.0, 0.5, freq_points, 2, amp_points, 4, out);
+  mus_close_file(out);
+
+  return(0);
+}
+
+/* gcc -o time-bird time-bird.c -lm -I. /home/bil/test/sndlib/libsndlib.a -lasound -lgsl -lgslcblas -O2 */
+/* time time-bird: 0.046u 0.003s 0:00.08 50.0%     0+0k 0+3448io 0pf+0w */
+/* (time (with-sound () (bird 0 10 440.0 10.0 0.5 '(0 0 1 1) '(0 0 1 1 2 1 3 0)))): 0.05230 */
+--------------------------------------------------------------------------------
+
+The violin in C is:
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <math.h>
+
+/* assume we've configured and built sndlib, so it has created a mus-config.h file */
+
+#include "mus-config.h"
+#include "s7.h"
+#include "xen.h"
+#include "clm.h"
+#include "clm2xen.h"
+
+static int feq(float x, int i) {return(fabs(x-i)<.00001);}
+
+void fm_violin(float start, float dur, float frequency, float amplitude, float fm_index, mus_any *op)
+{
+ float pervibfrq = 5.0,
+   ranvibfrq = 16.0,
+   pervibamp = .0025,
+   ranvibamp = .005,
+   noise_amount = 0.0,
+   noise_frq = 1000.0,
+   gliss_amp = 0.0,
+   fm1_rat = 1.0,
+   fm2_rat = 3.0,
+   fm3_rat = 4.0,
+   reverb_amount = 0.0,
+   degree = 0.0, 
+   distance = 1.0;
+  float fm_env[] = {0.0, 1.0, 25.0, 0.4, 75.0, 0.6, 100.0, 0.0};
+  float amp_env[] = {0.0, 0.0,  25.0, 1.0, 75.0, 1.0, 100.0, 0.0};
+  float frq_env[] = {0.0, -1.0, 15.0, 1.0, 25.0, 0.0, 100.0, 0.0};
+  int beg = 0, end, easy_case = 0, npartials, i;
+  float *coeffs, *partials;
+  float frq_scl, maxdev, logfrq, sqrtfrq, index1, index2, index3, norm;
+  float vib = 0.0, modulation = 0.0, fuzz = 0.0, indfuzz = 1.0, ampfuzz = 1.0;
+  mus_any *carrier, *fmosc1, *fmosc2, *fmosc3, *ampf;
+  mus_any *indf1, *indf2, *indf3, *fmnoi = NULL, *pervib, *ranvib, *frqf = NULL, *loc;
+  beg = start * mus_srate();
+  end = beg + dur * mus_srate();
+  frq_scl = mus_hz_to_radians(frequency);
+  maxdev = frq_scl * fm_index;
+  if ((noise_amount == 0.0) && 
+      (feq(fm1_rat, floor(fm1_rat))) && 
+      (feq(fm2_rat, floor(fm2_rat))) && 
+      (feq(fm3_rat, floor(fm3_rat)))) 
+    easy_case = 1;
+  logfrq = log(frequency);
+  sqrtfrq = sqrt(frequency);
+  index1 = maxdev * 5.0 / logfrq; 
+  if (index1 > M_PI) index1 = M_PI;
+  index2 = maxdev * 3.0 * (8.5 - logfrq) / (3.0 + frequency * .001); 
+  if (index2 > M_PI) index2 = M_PI;
+  index3 = maxdev * 4.0 / sqrtfrq; 
+  if (index3 > M_PI) index3 = M_PI;
+  if (easy_case)
+    {
+      npartials = floor(fm1_rat);
+      if ((floor(fm2_rat)) > npartials) npartials = floor(fm2_rat);
+      if ((floor(fm3_rat)) > npartials) npartials = floor(fm3_rat);
+      npartials++;
+      partials = (float *)calloc(npartials, sizeof(float));
+      partials[(int)(fm1_rat)] = index1;
+      partials[(int)(fm2_rat)] = index2;
+      partials[(int)(fm3_rat)] = index3;
+      coeffs = mus_partials_to_polynomial(npartials, partials, 1);
+      norm = 1.0;
+    }
+  else norm = index1;
+  carrier = mus_make_oscil(frequency, 0.0);
+  if (easy_case == 0)
+    {
+      fmosc1 = mus_make_oscil(frequency * fm1_rat, 0.0);
+      fmosc2 = mus_make_oscil(frequency * fm2_rat, 0.0);
+      fmosc3 = mus_make_oscil(frequency * fm3_rat, 0.0);
+    }
+  else fmosc1 = mus_make_oscil(frequency, 0.0);
+  ampf = mus_make_env(amp_env, 4, amplitude, 0.0, 1.0, dur, 0, NULL);
+  indf1 = mus_make_env(fm_env, 4, norm, 0.0, 1.0, dur, 0, NULL);
+  if (gliss_amp != 0.0) 
+    frqf = mus_make_env(frq_env, 4, gliss_amp * frq_scl, 0.0, 1.0, dur, 0, NULL);
+  if (easy_case == 0)
+    {
+      indf2 = mus_make_env(fm_env, 4, index2, 0.0, 1.0, dur, 0, NULL);
+      indf3 = mus_make_env(fm_env, 4, index3, 0.0, 1.0, dur, 0, NULL);
+    }
+  pervib = mus_make_triangle_wave(pervibfrq, frq_scl * pervibamp, 0.0);
+  ranvib = mus_make_rand_interp(ranvibfrq, frq_scl * ranvibamp);
+  if (noise_amount != 0.0) fmnoi = mus_make_rand(noise_frq, noise_amount * M_PI);
+  loc = mus_make_locsig(degree, distance, reverb_amount, 1, (mus_any *)op, 0, NULL, MUS_INTERP_LINEAR);
+  for (i = beg; i < end; i++)
+    {
+      if (noise_amount != 0.0) fuzz = mus_rand(fmnoi, 0.0);
+      if (frqf) vib = mus_env(frqf); else vib = 0.0;
+      vib += mus_triangle_wave(pervib, 0.0) + mus_rand_interp(ranvib, 0.0);
+      if (easy_case)
+	modulation = mus_env(indf1) * 
+                     mus_polynomial(coeffs, mus_oscil(fmosc1, vib, 0.0), npartials);
+      else
+	modulation = mus_env(indf1) * mus_oscil(fmosc1, (fuzz + fm1_rat * vib), 0.0) + 
+	             mus_env(indf2) * mus_oscil(fmosc2, (fuzz + fm2_rat * vib), 0.0) + 
+	             mus_env(indf3) * mus_oscil(fmosc3, (fuzz + fm3_rat * vib), 0.0);
+      mus_locsig(loc, i, mus_env(ampf) * mus_oscil(carrier, vib + indfuzz * modulation, 0.0));
+    }
+  mus_free(pervib);
+  mus_free(ranvib);
+  mus_free(carrier);
+  mus_free(fmosc1);
+  mus_free(ampf);
+  mus_free(indf1);
+  if (fmnoi) mus_free(fmnoi);
+  if (frqf) mus_free(frqf);
+  if (!(easy_case))
+    {
+      mus_free(indf2);
+      mus_free(indf3);
+      mus_free(fmosc2);
+      mus_free(fmosc3);
+    }
+  else
+    free(partials);
+  mus_free(loc);
+}
+
+int main(int argc, char *argv[])
+{
+  mus_any *osc = NULL, *op = NULL;
+  mus_sound_initialize();	
+
+  op = mus_make_sample_to_file("test.snd", 1, MUS_BSHORT, MUS_NEXT);
+  if (op)
+    {
+      fm_violin(0.0, 200.0, 440.0, .3, 1.0, op);
+      mus_free(op);
+    }
+  return(0);
+}
+
+/* time time-violin: 1.641u 0.060s 0:02.49 68.2%     0+0k 0+34456io 0pf+0w */
+/* (time (with-sound () (fm-violin 0 200 440 .1))): 2.826584 */
+
+--------------------------------------------------------------------------------
